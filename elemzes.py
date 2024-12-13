@@ -1,114 +1,193 @@
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
-from sklearn.naive_bayes import MultinomialNB
-from sklearn.metrics import accuracy_score
-from gensim.models import KeyedVectors
+import re
+from sklearn.metrics.pairwise import cosine_similarity
 
-# GLOBAL VARIABLES
-SEED = 42
-np.random.seed(SEED)
+listBOYS = []
+listGIRLS = []
 
-# Word2Vec model betöltése
-# (Cseréld ki egy helyi vagy távoli modellel, pl. Google News Word2Vec.)
-# w2v_model = KeyedVectors.load_word2vec_format('path/to/word2vec.bin', binary=True)
-w2v_model = None  # Példa helykitöltő
-
-# 1. DATA STRUCTURE FOR FEATURES
-columns = [
-    "avg_word_length",  # Átlagos szóhossz
-    "sentence_count",   # Mondatok száma
-    "vocabulary_richness",  # Egyedi szavak aránya
-    "sentiment_score",  # Szöveg szentiment elemzése
-    "frequent_topics",  # Gyakori témák aránya
-    "word2vec_similarity_1",  # Word2Vec alapján valamilyen hasonlóság
-    "word2vec_similarity_2",  # Word2Vec egy másik aspektusa
-    "emotional_intensity",  # Érzelmi szavak aránya
-    "key_phrase_density",  # Kulcskifejezések aránya
-    "dialogue_presence"   # Dialógus jelenléte a szövegben
+KEY_PHRASES = [
+    "love", "hate", "happy", "sad", "family", "friends", "school", "stress", "homework", "relationship",
+    "dreams", "goals", "future", "memories", "regret", "anger", "fear", "joy", "conflict", "anxiety",
+    "peace", "grief", "boredom", "happiness", "excitement", "disappointment", "hope", "change", "self",
+    "friendship", "loneliness", "inspiration"
 ]
 
-def generate_empty_features(n):
-    """Létrehoz egy üres DataFrame-et a feature-ek tárolására."""
-    return pd.DataFrame(np.zeros((n, len(columns))), columns=columns)
+def readFile(txt, marker, result_list):
+    with open(txt, "r", encoding="utf-8") as f:
+        content = f.read()  
+        entries = content.split(marker)  
+        for entry in entries:
+            if entry.strip():  
+                result_list.append(entry.strip())
 
-# 2. TEXT PROCESSING PIPELINE
-def extract_features(text, model=None):
-    """Kivonja a szöveges feature-eket egy naplórészletből.
-    Arguments:
-        text (str): A naplórészlet szövege.
-        model (KeyedVectors): Word2Vec modell a hasonlósági feature-ekhez.
-    Returns:
-        list: Kiszámított feature-értékek.
-    """
-    # Példa feature-ek kiszámítása
-    avg_word_length = np.mean([len(word) for word in text.split()])
-    sentence_count = text.count('.') + text.count('!') + text.count('?')
-    words = text.split()
-    unique_words = set(words)
-    vocabulary_richness = len(unique_words) / len(words)
-    sentiment_score = 0  # Ideális esetben egy NLP sentiment modell használata
+def count_uppercase_words_not_first(text):
+    sentences = re.split(r'(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=\.|\?)\s', text)
+    
+    count = 0
+    for sentence in sentences:
+        words = sentence.split()
+        if len(words) > 1:  
+            for word in words[1:]: 
+                if word.isupper():  
+                    count += 1
+    
+    return count
 
-    # Word2Vec hasonlóságok (helykitöltők, valódi modellel cseréld ki)
-    word2vec_similarity_1 = 0
-    word2vec_similarity_2 = 0
+def sentence_structure_complexity(text):
+    sentences = re.split(r'(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=\.|\?|!|;)', text)
+    
+    if not sentences:
+        return 0
 
-    emotional_intensity = sum(1 for word in words if word.lower() in ["love", "hate", "happy", "sad"]) / len(words)
-    key_phrase_density = 0.1  # Példaérték, számítsd ki valós kulcskifejezésekkel
-    dialogue_presence = text.count('"') / max(sentence_count, 1)
-
-    return [
-        avg_word_length, sentence_count, vocabulary_richness, sentiment_score,
-        0, word2vec_similarity_1, word2vec_similarity_2,
-        emotional_intensity, key_phrase_density, dialogue_presence
+    clause_counts = [
+        len(re.split(r'(?<=\w),\s*(?=\w)|(?<=\w)\.\s*(?=\w)|(?<=\w)\s(and|or)\s(?=\w)', sentence))
+        for sentence in sentences
     ]
 
-# 3. SIMULATION OF FEATURE EXTRACTION
-n_boys, n_girls = 20, 20
-boy_texts = [f"Boy {i} diary text." for i in range(n_boys)]  # Helykitöltő szövegek
-girl_texts = [f"Girl {i} diary text." for i in range(n_girls)]
-
-# Feature-ek kiszámítása
-boy_features = [extract_features(text, w2v_model) for text in boy_texts]
-girl_features = [extract_features(text, w2v_model) for text in girl_texts]
-
-boy_df = pd.DataFrame(boy_features, columns=columns)
-girl_df = pd.DataFrame(girl_features, columns=columns)
-
-# 4. MATCHING PAIRS USING NAIVE BAYES
-# Összefésülés egyetlen DataFrame-be
-boy_df["label"] = "boy"
-girl_df["label"] = "girl"
-all_data = pd.concat([boy_df, girl_df], ignore_index=True)
-
-# Adatok szétválasztása tanítási és tesztelési szettekre
-X = all_data[columns]
-y = all_data["label"]
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=SEED)
-
-# Naiv Bayes osztályozó betanítása
-model = MultinomialNB()
-model.fit(X_train, y_train)
-
-# Predikció
-predictions = model.predict(X_test)
-accuracy = accuracy_score(y_test, predictions)
-
-print(f"Model accuracy: {accuracy:.2f}")
-
-# 5. PAIR OPTIMIZATION
-def optimize_pairs(boy_features, girl_features):
-    """Optimalizálja a fiú-lány párokat a feature-ek alapján."""
-    boy_indices = list(range(len(boy_features)))
-    girl_indices = list(range(len(girl_features)))
+    avg_clause_count = np.mean(clause_counts)
     
+    return avg_clause_count
+
+def min_max_normalize(value, min_val, max_val):
+    return (value - min_val) / (max_val - min_val) * 99 + 1
+
+def calculate_key_phrase_density(text):
+    words = text.lower().split()
+    word_count = len(words)
+    
+    key_phrase_counts = {phrase: words.count(phrase) for phrase in KEY_PHRASES}
+    
+    total_key_phrases = sum(key_phrase_counts.values())
+    
+    if word_count == 0:
+        return 0
+    return total_key_phrases / word_count
+
+
+
+def extract_features(text):
+    avg_word_length = np.mean([len(word) for word in text.split()]) 
+
+    sentence_count = text.count('.') + text.count('!') + text.count('?')   
+
+    words = text.split()                                                                                            
+    unique_words = set(words)                                                                                       
+    vocabulary_richness = len(unique_words) / len(words)   
+
+    # Example Word2Vec similarities (Placeholder, replace with actual calculation)
+    word2vec_similarity_1 = np.random.randint(1, 11)
+    word2vec_similarity_2 = np.random.randint(1, 11)                          
+
+    emotional_intensity = sum(1 for word in words if word.lower() in ["love", "hate", "happy", "sad", "awfull", "terribble","amazing","wonderfull"]) / len(words)  
+
+    key_phrase_density = calculate_key_phrase_density(text)
+
+    sentence_structure_complexity_score = sentence_structure_complexity(text)
+
+    separation_count = text.count(',') 
+
+    name_count = count_uppercase_words_not_first(text)
+
+    return [
+        avg_word_length,
+        sentence_count,
+        vocabulary_richness,
+        word2vec_similarity_1,
+        word2vec_similarity_2,
+        emotional_intensity,
+        key_phrase_density,
+        sentence_structure_complexity_score,
+        separation_count,
+        name_count
+    ]              
+
+def avragecalc(df):
+    listB = []
+    listG = []
+    for index, row in df.iterrows():
+        avg_score = row.mean() #átlag
+        if index.startswith("GIRL"): 
+            listG.append(avg_score)
+        elif index.startswith("BOY"):  
+            listB.append(avg_score)
+    return listB, listG
+
+def find_closest_pairs(BOYlistAVG, GIRLlistAVG):
     pairs = []
-    while boy_indices and girl_indices:
-        b_idx = boy_indices.pop(0)
-        g_idx = girl_indices.pop(0)
-        pairs.append((b_idx, g_idx))
     
-    return pairs
+    # összes kombó
+    for girl_index, girl_score in enumerate(GIRLlistAVG):
+        for boy_index, boy_score in enumerate(BOYlistAVG):
+            girl_id = f"GIRL{girl_index + 1}"
+            boy_id = f"BOY{boy_index + 1}"
+            score_difference = abs(girl_score - boy_score)
+            pairs.append((girl_id, boy_id, girl_score, boy_score, score_difference))
+    
+    
+    pairs.sort(key=lambda x: x[4])
+    
+    # 20 legjobb nem dupe pár kiválasztása
+    selected_pairs = []
+    paired_girls = set()
+    paired_boys = set()
+    
+    for girl, boy, girl_score, boy_score, diff in pairs:
+        if girl not in paired_girls and boy not in paired_boys:
+            selected_pairs.append((girl, boy, girl_score, boy_score, diff))
+            paired_girls.add(girl)
+            paired_boys.add(boy)
+        if len(selected_pairs) == 20:
+            break
+    
 
-pairs = optimize_pairs(boy_features, girl_features)
-print("Optimized pairs:", pairs)
+    for index, (girl, boy, girl_score, boy_score, diff) in enumerate(selected_pairs):
+        print(f"Pair {index + 1}: {girl} - {boy} {girl_score:.2f} - {boy_score:.2f} = {diff:.2f}")
+
+def main():
+    readFile("diariesBOY.txt", "-BOY-", listBOYS)
+    readFile("diariesGIRL.txt", "-GIRL-", listGIRLS)
+    print(len(listBOYS))
+    print(len(listGIRLS))
+    
+    # Collecting all features
+    all_features = []
+    all_identifiers = []
+
+    for i, boy_entry in enumerate(listBOYS):
+        features = extract_features(boy_entry)
+        all_features.append(features)
+        all_identifiers.append(f"BOY{i+1}")
+
+    for i, girl_entry in enumerate(listGIRLS):
+        features = extract_features(girl_entry)
+        all_features.append(features)
+        all_identifiers.append(f"GIRL{i+1}")
+
+    # Convert features into DataFrame for better representation
+    columns = [
+        "Avg Word Length",
+        "Sentence Count",
+        "Vocabulary Richness",
+        "Word2Vec 1",
+        "Word2Vec 2",
+        "Emotional Intensity",
+        "Key Phrase Density",
+        "Sentence Complexity",
+        "Separation Count",
+        "Name Count"
+    ]
+    
+    df = pd.DataFrame(all_features, columns=columns, index=all_identifiers)
+
+    # Normalize all features to the range 1-100
+    for column in columns:
+        min_val = df[column].min()
+        max_val = df[column].max()
+        df[column] = df[column].apply(lambda x: min_max_normalize(x, min_val, max_val))
+
+    BOYlistAVG, GIRLlistAVG = avragecalc(df)
+
+    find_closest_pairs(BOYlistAVG, GIRLlistAVG)
+
+main()
