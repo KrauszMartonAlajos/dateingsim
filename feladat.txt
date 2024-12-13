@@ -1,0 +1,23 @@
+Kóbor Ervin
+------PÁRVÁLASZTÁS------
+Készíts 20 darab fiú és 20 darab lány naplórészletet.
+Egy naplórészlet legalább 1500 szó, ANGOLUL!
+A naplórészleteket, valamilyen HATÉKONY módon tárold el.
+Pl.: Mappa/txtk
+Egy naplórészlet egy embert reprezentál.
+
+Készíts egy modellt, ami feature extractiont hajt végre.
+Legalább 10 feature-t kell alkoss egy szövegből, ebből legalább
+2-höz használd fel a word2vec pretrained modellt.
+
+A feature-öket úgy kell megválogatni, hogy mindegyiket megfelelő 
+indoklással látod el. 
+Az összes feature a PÁRVÁLASZTÁST, PÁRBA ÁLLÍTÁST szolgálja
+szemantikusan.
+
+AZ INDOKLÁSBÓL úgy készülj, mintha prezentációt tartanál,
+csak prezentáció nélkül.
+
+A feature extractionöd értelemszerűen valamilyen összetartozást
+fog a feladat végén definiálni, eszerint rangsorold a párba
+állított embereket.
