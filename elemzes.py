@@ -1,7 +1,15 @@
 import numpy as np
 import pandas as pd
+import random
 import re
 from sklearn.metrics.pairwise import cosine_similarity
+
+#from gensim import corpora = CANCER = RÁK
+from gensim.models import KeyedVectors
+
+path = 'C:/Users/xboxh/Desktop/datesim/dateingsim/GoogleNews-vectors-negative300.bin.gz'
+model = KeyedVectors.load_word2vec_format(path, binary=True)
+
 
 listBOYS = []
 listGIRLS = []
@@ -76,8 +84,8 @@ def extract_features(text):
     vocabulary_richness = len(unique_words) / len(words)   
 
     # Example Word2Vec similarities (Placeholder, replace with actual calculation)
-    word2vec_similarity_1 = np.random.randint(1, 11)
-    word2vec_similarity_2 = np.random.randint(1, 11)                          
+    word2vec_similarity_1 = findThemeinText("school", text, model, similarity_threshold=0.7)
+    word2vec_similarity_2 = findThemeinText("work", text, model, similarity_threshold=0.7)                         
 
     emotional_intensity = sum(1 for word in words if word.lower() in ["love", "hate", "happy", "sad", "awfull", "terribble","amazing","wonderfull"]) / len(words)  
 
@@ -100,7 +108,21 @@ def extract_features(text):
         sentence_structure_complexity_score,
         separation_count,
         name_count
-    ]              
+    ]     
+
+def findThemeinText(theme, text, keyed_vectors, similarity_threshold=0.7):
+    score = 0
+    words = re.findall(r'\b\w+\b', text.lower())
+    
+    score += words.count(theme.lower())
+    
+    for word in words:
+        if word != theme.lower() and word in keyed_vectors and theme in keyed_vectors:
+            similarity = keyed_vectors.similarity(theme, word)
+            if similarity >= similarity_threshold:
+                score += 1
+
+    return score
 
 def avragecalc(df):
     listB = []
